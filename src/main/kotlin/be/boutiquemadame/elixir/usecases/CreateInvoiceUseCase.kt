@@ -6,6 +6,7 @@ import be.boutiquemadame.elixir.domain.entities.Invoice
 import be.boutiquemadame.elixir.domain.entities.InvoiceId
 import be.boutiquemadame.elixir.domain.entities.InvoiceLine
 import be.boutiquemadame.elixir.shared.UseCase
+import java.math.BigDecimal
 import java.time.LocalDate
 
 class CreateInvoiceUseCase(
@@ -41,7 +42,12 @@ class CreateInvoiceUseCase(
         invoiceId: InvoiceId
     ): List<InvoiceLine> {
         return request.mapIndexed { index, createInvoiceRequestLine ->
-            InvoiceLine.create(invoiceId, index + 1, createInvoiceRequestLine.description)
+            InvoiceLine.create(
+                invoiceId,
+                index + 1,
+                createInvoiceRequestLine.description,
+                createInvoiceRequestLine.price
+            )
         }
     }
 }
@@ -52,7 +58,8 @@ data class CreateInvoiceRequest(
 )
 
 data class CreateInvoiceRequestLine(
-    val description: String
+    val description: String,
+    val price: BigDecimal
 )
 
 data class CreateInvoiceResponse(

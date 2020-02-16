@@ -18,6 +18,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import java.math.BigDecimal
 import java.time.LocalDate
 
 class CreateInvoiceTest {
@@ -73,22 +74,29 @@ class CreateInvoiceTest {
 
             recoveredInvoice?.invoiceDate shouldBe invoiceDate
         }
+
     }
 
     @Nested
     inner class WithoutLinesWithInventoryModification {
 
         @Test
-        fun shouldSaveLines() {
+        fun shouldSaveLinesWithDescription() {
             runBlocking {
                 val description = "Lorem ipsum"
-                val line = CreateInvoiceRequestLine(description)
+                val invoiceResponse = createInvoiceWithOneLine(description = description)
 
-                val invoiceResponse = createInvoice(lines = listOf(line))
+                firstLineDescriptionShouldBe(invoiceResponse, description)
+            }
+        }
 
-                val invoiceLines = getInvoiceLinesFromInvoiceStringId(invoiceResponse.id)
+        @Test
+        fun shouldSaveLinePrice() {
+            runBlocking {
+                val price = BigDecimal.valueOf(13.5)
+                val invoiceResponse = createInvoiceWithOneLine(price = price)
 
-                invoiceLines.getOrNull(0)?.description shouldBe description
+                firstLinePriceShouldBe(invoiceResponse, price)
             }
         }
 
@@ -110,6 +118,45 @@ class CreateInvoiceTest {
             }
         }
 
+        private suspend fun createInvoiceWithOneLine(
+            description: String = "Description",
+            price: BigDecimal = BigDecimal.valueOf(10)
+        ): CreateInvoiceResponse {
+            val line = buildLine(description, price)
+            return createInvoice(lines = listOf(line))
+        }
+
+        private fun buildLine(
+            description: String = "Description",
+            price: BigDecimal = BigDecimal.valueOf(10)
+        ): CreateInvoiceRequestLine {
+            return CreateInvoiceRequestLine(description, price)
+        }
+
+        private suspend fun firstLineDescriptionShouldBe(
+            invoiceResponse: CreateInvoiceResponse,
+            description: String
+        ) {
+            val firstLine = getInvoiceFirstLine(invoiceResponse)
+
+            firstLine?.description shouldBe description
+        }
+
+        private suspend fun firstLinePriceShouldBe(
+            invoiceResponse: CreateInvoiceResponse,
+            unitPrice: BigDecimal
+        ) {
+            val firstLine = getInvoiceFirstLine(invoiceResponse)
+
+            firstLine?.price shouldBe unitPrice
+        }
+
+        private suspend fun getInvoiceFirstLine(invoiceResponse: CreateInvoiceResponse): InvoiceLine? {
+            val invoiceLines = getInvoiceLinesFromInvoiceStringId(invoiceResponse.id)
+
+            return invoiceLines.getOrNull(0)
+        }
+
         private suspend fun lineNumberShouldIncrement(invoiceResponse: CreateInvoiceResponse) {
             val invoiceLines = getInvoiceLinesFromInvoiceStringId(invoiceResponse.id)
 
@@ -125,6 +172,12 @@ class CreateInvoiceTest {
             return createInvoice(lines = lines)
         }
 
+        private fun makeLinesForRequest(count: Int): List<CreateInvoiceRequestLine> {
+            return (1..count).map {
+                buildLine(description = "Description $it")
+            }
+        }
+
         private suspend fun lineOrderingShouldBeUnchanged(invoiceResponse: CreateInvoiceResponse) {
             val invoiceLines = getInvoiceLinesFromInvoiceStringId(invoiceResponse.id)
 
@@ -134,12 +187,6 @@ class CreateInvoiceTest {
 
             lineDescriptions.forEachIndexed { index, description ->
                 description shouldContain (index + 1).toString()
-            }
-        }
-
-        private fun makeLinesForRequest(count: Int): List<CreateInvoiceRequestLine> {
-            return (1..count).map {
-                CreateInvoiceRequestLine("Description $it")
             }
         }
     }

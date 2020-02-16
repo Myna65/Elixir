@@ -1,5 +1,6 @@
 package be.boutiquemadame.elixir.domain.entities
 
+import java.math.BigDecimal
 import java.time.LocalDate
 import java.util.*
 
@@ -18,13 +19,21 @@ data class InvoiceId(val raw: String) {
 
 data class Invoice(
     val id: InvoiceId,
-    val invoiceDate: LocalDate
+    val invoiceDate: LocalDate,
+    val amountExcludingVat: BigDecimal,
+    val vatAmount: BigDecimal,
+    val totalAmount: BigDecimal
 ) {
 
     companion object Factory {
-        fun createInvoice(invoiceDate: LocalDate): Invoice {
-            return Invoice(InvoiceId.generate(), invoiceDate)
+        fun createInvoice(
+            invoiceDate: LocalDate,
+            amountExcludingVat: BigDecimal,
+            vatAmount: BigDecimal
+        ): Invoice {
+            val totalAmount = amountExcludingVat + vatAmount
+
+            return Invoice(InvoiceId.generate(), invoiceDate, amountExcludingVat, vatAmount, totalAmount)
         }
     }
 }
-

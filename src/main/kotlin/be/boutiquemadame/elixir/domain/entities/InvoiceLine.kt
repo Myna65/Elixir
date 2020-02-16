@@ -2,23 +2,57 @@ package be.boutiquemadame.elixir.domain.entities
 
 import java.math.BigDecimal
 
-data class InvoiceLine(
-    val id: InvoiceLineId,
+sealed class InvoiceLine {
+    abstract fun getId(): InvoiceLineId
+}
+
+data class InvoiceLineWithoutProduct(
+    private val id: InvoiceLineId,
     val description: String,
     val price: BigDecimal
-) {
+) : InvoiceLine() {
+
+    override fun getId(): InvoiceLineId {
+        return id
+    }
 
     companion object {
         fun create(
             invoiceId: InvoiceId,
             lineNumber: Int,
             description: String,
-            price: BigDecimal
-            ): InvoiceLine {
+            amount: BigDecimal
+        ): InvoiceLine {
 
             val invoiceLineId = InvoiceLineId.fromInvoiceIdAndLineNumber(invoiceId, lineNumber)
 
-            return InvoiceLine(invoiceLineId, description, price)
+            return InvoiceLineWithoutProduct(invoiceLineId, description, amount)
+        }
+    }
+}
+
+data class InvoiceLineWithProduct(
+    private val id: InvoiceLineId,
+    val productId: ArticleId,
+    val quantity: Int,
+    val unitPrice: BigDecimal
+) : InvoiceLine() {
+
+    override fun getId(): InvoiceLineId {
+        return id
+    }
+
+    companion object {
+        fun create(
+            invoiceId: InvoiceId,
+            lineNumber: Int,
+            productId: ArticleId,
+            quantity: Int,
+            unitPrice: BigDecimal
+        ): InvoiceLine {
+            val invoiceLineId = InvoiceLineId.fromInvoiceIdAndLineNumber(invoiceId, lineNumber)
+
+            return InvoiceLineWithProduct(invoiceLineId, productId, quantity, unitPrice)
         }
     }
 }

@@ -11,6 +11,7 @@ import be.boutiquemadame.elixir.usecases.*
 import io.kotlintest.matchers.string.shouldContain
 import io.kotlintest.shouldBe
 import io.kotlintest.shouldNotBe
+import io.kotlintest.shouldThrow
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
@@ -25,6 +26,7 @@ class CreateInvoiceTest {
 
     @BeforeEach
     fun setupAdapters() {
+        articleGateway = ArticleInMemoryGateway()
         invoiceGateway = InvoiceInMemoryGateway()
         invoiceLineGateway = InvoiceLineInMemoryGateway()
     }
@@ -280,6 +282,30 @@ class CreateInvoiceTest {
             }
         }
 
+        @Test
+        fun shouldNotAcceptNegativePrice() {
+            shouldThrow<NegativePriceError> {
+                runBlocking {
+                    val unitPrice = BigDecimal(-12)
+
+                    val line = buildLineWithNewProduct(unitPrice = unitPrice)
+
+                    createInvoiceWithOneLine(line)
+                }
+            }
+        }
+
+        /*
+        @Test
+        fun shouldRejectIfTheSameProductAlreadyExists() {
+            shouldThrow<AlreadyExistingProduct> {
+                runBlocking {
+
+                }
+            }
+        }
+       */
+
         private suspend fun productShouldHaveArticleNumber(
             invoiceId: String,
             articleNumber: String
@@ -346,6 +372,10 @@ class CreateInvoiceTest {
             return lines.getOrNull(0) as InvoiceLineWithProduct
         }
     }
+
+    @Nested
+    inner class WithLinesWithExistingProduct
+
     @Nested
     inner class WithLines {
 
@@ -370,6 +400,7 @@ class CreateInvoiceTest {
             invoice?.totalAmount shouldBe total
         }
     }
+
     private suspend fun getInvoiceFromInvoiceStringId(id: String): Invoice? {
         val invoiceId = InvoiceId.fromString(id)
 

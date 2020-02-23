@@ -5,6 +5,7 @@ import be.boutiquemadame.elixir.domain.contracts.InvoiceGateway
 import be.boutiquemadame.elixir.domain.contracts.InvoiceLineGateway
 import be.boutiquemadame.elixir.domain.entities.*
 import be.boutiquemadame.elixir.shared.UseCase
+import java.lang.Exception
 import java.math.BigDecimal
 import java.time.LocalDate
 
@@ -56,6 +57,8 @@ class CreateInvoiceUseCase(
             }
         }
 
+        validateLines(invoiceLines)
+
         invoiceLineGateway.saveMultiple(invoiceLines)
     }
 
@@ -88,6 +91,20 @@ class CreateInvoiceUseCase(
             request.quantity,
             request.unitPrice
         )
+    }
+
+    private fun validateLines(invoiceLines: List<InvoiceLine>) {
+        invoiceLines.forEach {
+            line ->
+            when (line) {
+                is InvoiceLineWithProduct -> validateLineWithProduct(line)
+            }
+        }
+    }
+
+    private fun validateLineWithProduct(line: InvoiceLineWithProduct) {
+        if (line.unitPrice.signum() < 0)
+            throw NegativePriceError(line.getId().lineNumber, line.unitPrice)
     }
 }
 
@@ -124,3 +141,11 @@ data class CreateInvoiceResponse(
         }
     }
 }
+
+sealed class CreateInvoiceError(message: String) : Exception(message)
+
+class NegativePriceError(lineIndex: Int, price: BigDecimal) :
+    CreateInvoiceError("Negative price is forbidden on lines referring to a product.\nLine: $lineIndex, found negative price: $price")
+
+class AlreadyExistingProduct(lineIndex: Int, model: String, articleNumber: String, size: String, color: String, foundProductId: InvoiceId) :
+    CreateInvoiceError("The product requested for creation already exists.\nLine $lineIndex: \"$model\", \"$articleNumber\", \"$size\", \"$color\" already exists in the database under id: ${foundProductId.raw}")

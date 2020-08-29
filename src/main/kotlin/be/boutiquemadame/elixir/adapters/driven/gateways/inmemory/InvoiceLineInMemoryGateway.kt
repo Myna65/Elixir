@@ -10,13 +10,15 @@ class InvoiceLineInMemoryGateway() : InvoiceLineGateway {
 
     override suspend fun getByInvoiceId(invoiceId: InvoiceId): List<InvoiceLine> {
         return invoiceLines.values.toList().filter {
-            invoiceLine -> invoiceLine.getId().invoiceId == invoiceId
+            invoiceLine ->
+            invoiceLine.getId().invoiceId == invoiceId
         }.sortedBy { it.getId().lineNumber }
     }
 
     override suspend fun saveMultiple(invoiceLinesToAdd: List<InvoiceLine>) {
         invoiceLinesToAdd.forEach {
-            invoiceLine -> invoiceLines[invoiceLine.getId()] = invoiceLine
+            invoiceLine ->
+            invoiceLines[invoiceLine.getId()] = invoiceLine
         }
     }
 }

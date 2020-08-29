@@ -1,6 +1,6 @@
 package be.boutiquemadame.elixir.domain.entities
 
-import java.util.*
+import java.util.UUID
 
 data class ArticleId(val raw: String) {
     companion object Factory {

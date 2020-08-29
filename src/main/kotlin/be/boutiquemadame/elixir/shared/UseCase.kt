@@ -1,5 +1,7 @@
 package be.boutiquemadame.elixir.shared
 
-interface UseCase<I, O> {
-    suspend fun execute(request: I): O
+import arrow.core.Either
+
+interface UseCase<I, E, O> {
+    suspend fun execute(request: I): Either<E, O>
 }

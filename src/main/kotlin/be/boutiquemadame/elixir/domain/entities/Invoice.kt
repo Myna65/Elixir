@@ -2,7 +2,7 @@ package be.boutiquemadame.elixir.domain.entities
 
 import java.math.BigDecimal
 import java.time.LocalDate
-import java.util.*
+import java.util.UUID
 
 data class InvoiceId(val raw: String) {
     companion object Factory {

@@ -1,5 +1,6 @@
 package be.boutiquemadame.elixir.usecases
 
+import arrow.core.Either
 import be.boutiquemadame.elixir.domain.contracts.ArticleGateway
 import be.boutiquemadame.elixir.domain.contracts.InvoiceGateway
 import be.boutiquemadame.elixir.domain.contracts.InvoiceLineGateway
@@ -13,14 +14,14 @@ class CreateInvoiceUseCase(
     private val articleGateway: ArticleGateway,
     private val invoiceGateway: InvoiceGateway,
     private val invoiceLineGateway: InvoiceLineGateway
-) : UseCase<CreateInvoiceRequest, CreateInvoiceResponse> {
+) : UseCase<CreateInvoiceRequest, CreateInvoiceError, CreateInvoiceResponse> {
 
-    override suspend fun execute(request: CreateInvoiceRequest): CreateInvoiceResponse {
+    override suspend fun execute(request: CreateInvoiceRequest): Either<CreateInvoiceError, CreateInvoiceResponse> {
         val invoice = createAndSaveInvoice(request)
 
         createAndSaveInvoiceLines(request.lines, invoice.id)
 
-        return CreateInvoiceResponse.fromInvoice(invoice)
+        return Either.right(CreateInvoiceResponse.fromInvoice(invoice))
     }
 
     private suspend fun createAndSaveInvoice(request: CreateInvoiceRequest): Invoice {
@@ -35,7 +36,7 @@ class CreateInvoiceUseCase(
         return lines.fold(BigDecimal.ZERO) {
             acc, createInvoiceRequestLine ->
             when (createInvoiceRequestLine) {
-                is CreateInvoiceRequestLineWithoutProduct -> {
+                is CreateInvoiceRequestTextLine -> {
                     acc.add(createInvoiceRequestLine.price)
                 }
                 is CreateInvoiceRequestLineWithNewProduct -> {
@@ -52,27 +53,27 @@ class CreateInvoiceUseCase(
         val invoiceLines = lines.mapIndexed {
             index, line ->
             when (line) {
-                is CreateInvoiceRequestLineWithoutProduct -> createInvoiceLineWithoutProduct(line, invoiceId, index)
-                is CreateInvoiceRequestLineWithNewProduct -> createInvoiceLineWithNewProduct(line, invoiceId, index)
+                is CreateInvoiceRequestTextLine -> createInvoiceLineWithoutProduct(line, invoiceId, index)
+                is CreateInvoiceRequestLineWithNewProduct -> Either.right(createInvoiceLineWithNewProduct(line, invoiceId, index))
             }
         }
 
-        validateLines(invoiceLines)
+        invoiceLines
 
         invoiceLineGateway.saveMultiple(invoiceLines)
     }
 
     private fun createInvoiceLineWithoutProduct(
-        request: CreateInvoiceRequestLineWithoutProduct,
+        request: CreateInvoiceRequestTextLine,
         invoiceId: InvoiceId,
         index: Int
-    ): InvoiceLine {
-        return InvoiceLineWithoutProduct.create(
+    ): Either<CreateInvoiceError, InvoiceLine> {
+        return InvoiceTextLine.create(
             invoiceId,
             index + 1,
             request.description,
             request.price
-        )
+        ).mapLeft { error -> CreateInvoiceError.NegativePrice(error) }
     }
 
     private suspend fun createInvoiceLineWithNewProduct(
@@ -84,7 +85,7 @@ class CreateInvoiceUseCase(
 
         articleGateway.save(product)
 
-        return InvoiceLineWithProduct.create(
+        return InvoiceProductLine.create(
             invoiceId,
             index + 1,
             product.getId(),
@@ -93,19 +94,6 @@ class CreateInvoiceUseCase(
         )
     }
 
-    private fun validateLines(invoiceLines: List<InvoiceLine>) {
-        invoiceLines.forEach {
-            line ->
-            when (line) {
-                is InvoiceLineWithProduct -> validateLineWithProduct(line)
-            }
-        }
-    }
-
-    private fun validateLineWithProduct(line: InvoiceLineWithProduct) {
-        if (line.unitPrice.signum() < 0)
-            throw NegativePriceError(line.getId().lineNumber, line.unitPrice)
-    }
 }
 
 data class CreateInvoiceRequest(
@@ -116,7 +104,7 @@ data class CreateInvoiceRequest(
 
 sealed class CreateInvoiceRequestLine
 
-data class CreateInvoiceRequestLineWithoutProduct(
+data class CreateInvoiceRequestTextLine(
     val description: String,
     val price: BigDecimal
 ) : CreateInvoiceRequestLine()
@@ -142,10 +130,9 @@ data class CreateInvoiceResponse(
     }
 }
 
-sealed class CreateInvoiceError(message: String) : Exception(message)
-
-class NegativePriceError(lineIndex: Int, price: BigDecimal) :
-    CreateInvoiceError("Negative price is forbidden on lines referring to a product.\nLine: $lineIndex, found negative price: $price")
+sealed class CreateInvoiceError {
+    data class NegativePrice(val error: NegativePriceError) : CreateInvoiceError()
+}
 
 class AlreadyExistingProduct(lineIndex: Int, model: String, articleNumber: String, size: String, color: String, foundProductId: InvoiceId) :
-    CreateInvoiceError("The product requested for creation already exists.\nLine $lineIndex: \"$model\", \"$articleNumber\", \"$size\", \"$color\" already exists in the database under id: ${foundProductId.raw}")
+    Exception("The product requested for creation already exists.\nLine $lineIndex: \"$model\", \"$articleNumber\", \"$size\", \"$color\" already exists in the database under id: ${foundProductId.raw}")

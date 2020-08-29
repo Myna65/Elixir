@@ -1,12 +1,14 @@
 package be.boutiquemadame.elixir.domain.entities
 
+import arrow.core.Either
+import be.boutiquemadame.elixir.usecases.CreateInvoiceError
 import java.math.BigDecimal
 
 sealed class InvoiceLine {
     abstract fun getId(): InvoiceLineId
 }
 
-data class InvoiceLineWithoutProduct(
+data class InvoiceTextLine(
     private val id: InvoiceLineId,
     val description: String,
     val price: BigDecimal
@@ -22,16 +24,19 @@ data class InvoiceLineWithoutProduct(
             lineNumber: Int,
             description: String,
             amount: BigDecimal
-        ): InvoiceLine {
+        ): Either<NegativePriceError, InvoiceLine> {
+            if(amount < BigDecimal.ZERO) {
+                Either.left(NegativePriceError(lineNumber, amount))
+            }
 
             val invoiceLineId = InvoiceLineId.fromInvoiceIdAndLineNumber(invoiceId, lineNumber)
 
-            return InvoiceLineWithoutProduct(invoiceLineId, description, amount)
+            return Either.right(InvoiceTextLine(invoiceLineId, description, amount))
         }
     }
 }
 
-data class InvoiceLineWithProduct(
+data class InvoiceProductLine(
     private val id: InvoiceLineId,
     val productId: ArticleId,
     val quantity: Int,
@@ -52,7 +57,7 @@ data class InvoiceLineWithProduct(
         ): InvoiceLine {
             val invoiceLineId = InvoiceLineId.fromInvoiceIdAndLineNumber(invoiceId, lineNumber)
 
-            return InvoiceLineWithProduct(invoiceLineId, productId, quantity, unitPrice)
+            return InvoiceProductLine(invoiceLineId, productId, quantity, unitPrice)
         }
     }
 }
@@ -64,3 +69,5 @@ data class InvoiceLineId(val invoiceId: InvoiceId, val lineNumber: Int) {
         }
     }
 }
+
+data class NegativePriceError(val lineIndex: Int, val price: BigDecimal)
